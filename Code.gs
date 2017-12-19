@@ -129,7 +129,8 @@ var logEvent = function(sheet, logDesc, logReporting, event) {
 		newRow.push("=HOUR(" + dateCell + ")");
 	}	
 	sheet.appendRow(newRow);
-    setSensorState(event.device, event.name, event.value, event.time, false)
+    var targetSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LatestStatus");
+    setSensorState(targetSheet, event.device, event.name, event.value, event.time, false)
 }
 
 var initializeHeaderRow = function(sheet, logDesc, logReporting) {		
@@ -269,9 +270,8 @@ var clearSheet = function(sheet) {
 	sheet.getRange(2, 1, 1, sheet.getLastColumn()).clearContent();
 }  
 
-var setSensorState = function(deviceID, eventName, eventValue, dateTime, firstTime) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LatestStatus");
-  var values = sheet.getRange('A:A').getValues();
+var setSensorState = function (targetSheet, deviceID, eventName, eventValue, dateTime, firstTime) {
+  var values = targetSheet.getRange('A:A').getValues();
   var updateRow = 0;
   for (i = 0; i < values.length; i++){
     // If this is first time and we have already sensor, then break
@@ -283,10 +283,10 @@ var setSensorState = function(deviceID, eventName, eventValue, dateTime, firstTi
     }
   }
   // Either update an existing row or create a new one.
-  sheet.getRange(updateRow, 1).setValue(deviceID);
-  sheet.getRange(updateRow, 2).setValue(eventName);
-  sheet.getRange(updateRow, 3).setValue((sensorStates[eventValue] == null ? eventValue :sensorStates[eventValue]));
-  sheet.getRange(updateRow, 4).setValue(dateTime);
+  targetSheet.getRange(updateRow, 1).setValue(deviceID);
+  targetSheet.getRange(updateRow, 2).setValue(eventName);
+  targetSheet.getRange(updateRow, 3).setValue((sensorStates[eventValue] == null ? eventValue : sensorStates[eventValue]));
+  targetSheet.getRange(updateRow, 4).setValue(dateTime);
   
   return true;
 
@@ -298,12 +298,18 @@ function testSensorState (deviceID, eventName, eventValue, dateTime) {
   setSensorState("Door - Front", "contact", sensorStates["closed"], "12/19/2017 10:20:58")
 }
 
+/***
+ * This seems to operate incredibly slowly, like one row each second
+ * Method works from the last entry up and records the last state of each sensor
+ * This is to seed the LatestStatus table which tracks the latest status for each sensor
+ */
 function setAllLatestStates() {
+  var targetSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LatestStatus");
   var sheet = SpreadsheetApp.getActiveSheet();
   sheet.getRange("D:D").setNumberFormat('MM/dd/yyyy HH:mm:ss');
   var values = sheet.getRange('A:D').getValues();
   var listlength = values.length;
   for (var i = listlength - 1; i > 0 ; i--) {
-    setSensorState(values[i][1], values[i][2], values[i][3], values[i][0], true)
+    setSensorState(targetSheet, values[i][1], values[i][2], values[i][3], values[i][0], true)
   }
 }
