@@ -43,6 +43,18 @@
    
 var getVersion = function() { return "01.03.00"; }
  
+var sensorStates = {};
+sensorStates["closed"] = "inactive";
+sensorStates["open"] = "active";
+sensorStates["present"] = "active";
+sensorStates["not present"] = "inactive";
+sensorStates["active"] = "active";
+sensorStates["inactive"] = "inactive";
+sensorStates["online"] = "active";
+sensorStates["offline"] = "inactive";
+sensorStates["on"] = "active";
+sensorStates["off"] = "inactive";
+
 function doGet(e) {
 	var output = "Version " + getVersion()
 	return ContentService.createTextOutput(output);
@@ -117,6 +129,7 @@ var logEvent = function(sheet, logDesc, logReporting, event) {
 		newRow.push("=HOUR(" + dateCell + ")");
 	}	
 	sheet.appendRow(newRow);
+    setSensorState(event.device, event.name, event.value, event.time, false)
 }
 
 var initializeHeaderRow = function(sheet, logDesc, logReporting) {		
@@ -125,7 +138,10 @@ var initializeHeaderRow = function(sheet, logDesc, logReporting) {
 			"Date/Time",
 			"Device",
 			"Event Name",
-			"Event Value"
+			"Event Value",
+            "=arrayformula( if( row(F:F)=1, \"EventDate\", DATEVALUE (YEAR(A:A)&\"/\"&MONTH(A:A)&\"/\"&DAY(A:A))))",
+            "=arrayformula( if( row(G:G)=1, \"DeviceID\", SUBSTITUTE(B:B, \"Motion Sensor\", \"MS\" )))",
+            "=arrayformula( if( row(H:H)=1, \"EventHour\",HOUR(A:A)))"
 		];		
 		sheet.appendRow(header);
 		sheet.getRange("A:A").setNumberFormat('MM/dd/yyyy HH:mm:ss');
@@ -252,3 +268,42 @@ var clearSheet = function(sheet) {
 	}
 	sheet.getRange(2, 1, 1, sheet.getLastColumn()).clearContent();
 }  
+
+var setSensorState = function(deviceID, eventName, eventValue, dateTime, firstTime) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("LatestStatus");
+  var values = sheet.getRange('A:A').getValues();
+  var updateRow = 0;
+  for (i = 0; i < values.length; i++){
+    // If this is first time and we have already sensor, then break
+    if ((values[i][0] == deviceID) && firstTime) {
+      return true;
+    } else if ((values[i][0] == deviceID) || (values[i][0].length == 0)) {
+      updateRow = i + 1
+      break;
+    }
+  }
+  // Either update an existing row or create a new one.
+  sheet.getRange(updateRow, 1).setValue(deviceID);
+  sheet.getRange(updateRow, 2).setValue(eventName);
+  sheet.getRange(updateRow, 3).setValue((sensorStates[eventValue] == null ? eventValue :sensorStates[eventValue]));
+  sheet.getRange(updateRow, 4).setValue(dateTime);
+  
+  return true;
+
+}
+
+function testSensorState (deviceID, eventName, eventValue, dateTime) {
+  setSensorState("Door - Front", "contact", sensorStates["open"], "12/19/2017 10:20:58")
+  setSensorState("Motion Sensor - Hallway", "motion", sensorStates["inactive"], "12/19/2017 10:20:58")
+  setSensorState("Door - Front", "contact", sensorStates["closed"], "12/19/2017 10:20:58")
+}
+
+function setAllLatestStates() {
+  var sheet = SpreadsheetApp.getActiveSheet();
+  sheet.getRange("D:D").setNumberFormat('MM/dd/yyyy HH:mm:ss');
+  var values = sheet.getRange('A:D').getValues();
+  var listlength = values.length;
+  for (var i = listlength - 1; i > 0 ; i--) {
+    setSensorState(values[i][1], values[i][2], values[i][3], values[i][0], true)
+  }
+}
